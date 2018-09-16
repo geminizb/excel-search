@@ -1,0 +1,67 @@
+# coding: utf-8
+
+import pandas as pd
+import os
+import PySimpleGUI as sg
+
+data = None
+column = ''
+
+def load_file(filename, sheetname):
+    try:
+        return pd.read_excel(filename, sheetname).fillna('')
+    except:
+        return
+
+def search_text(text):
+    if data is None:
+        return
+    data['key'] = ['{} - {}'.format(i, v) for i, v in enumerate(data[column])]
+    return data[data[column].str.find(text) >= 0]
+
+def show_detail(result):
+    if len(result) == 0:
+        return
+    return data[data['key'] == result[0]].iloc[0, :-1]
+
+with sg.FlexForm('Search in Excel File') as form:
+    form_rows = [
+        [sg.Text('Excel File:', size=(15, 1)), sg.Input(key='file'), sg.FileBrowse()],
+        [sg.Text('Sheet Name:', size=(15, 1)), sg.InputText('Sheet1', key='sheet')],
+        [sg.Text('Load File:', size=(15, 1)), sg.ReadFormButton('Load'),
+         sg.Text('', size=(30, 1), key='load_msg')],
+        [sg.Text('_' * 80)],
+        [sg.Text('Search Text:', size=(15, 1)), sg.InputText(size=(30, 1), key='text'),
+         sg.InputCombo(['Column Name'], size=(10, 1), key='column'), sg.ReadFormButton('Search')],
+        [sg.Text('Search Result:', size=(15, 1)),
+         sg.Listbox(['Column Value'], size=(54, 10), select_mode='single', key='result')],
+        [sg.Text('Show Details:', size=(15, 1)), sg.ReadFormButton('Show')],
+        [sg.Text('Record Details:', size=(15, 1)), sg.Output(size=(54, 10))],
+        [sg.Text('_' * 80)],
+        [sg.Quit()]
+    ]
+    form.Layout(form_rows)
+    
+    while True:
+        button, values = form.Read()
+        if button is None or button == 'Quit':
+            break
+        elif button == 'Load':
+            data = load_file(values['file'], values['sheet'])
+            if data is not None:
+                colnames = data.columns.tolist()
+                form.FindElement('column').Update(values=colnames)
+                form.FindElement('load_msg').Update(os.path.basename(values['file']))
+            else:
+                form.FindElement('load_msg').Update('Load Failed!')
+        elif button == 'Search':
+            column = values['column']
+            data_searched = search_text(values['text'])
+            if data_searched is not None:
+                results = data_searched['key']
+                form.FindElement('result').Update(results)
+        elif button == 'Show':
+            detail = show_detail(values['result'])
+            if detail is not None:
+                for name, value in detail.items():
+                    print('{}: {}'.format(name, value))
